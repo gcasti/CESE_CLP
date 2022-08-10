@@ -22,20 +22,18 @@ architecture Behavioral of shift_reg is
 
 	signal reg : std_logic_vector(LENGTH-1 downto 0) := (others => '0');
 begin
-    main_process : process(clk_i) is
+    main_process : process(clk_i, rst_i) is
     begin
         if rising_edge(clk_i) then
             if rst_i = '1' then
                 reg <= (others => '0');
-				else	 
-                if load_i = '1' then
-                    reg <= data_reg_i;
+            elsif load_i = '1' then
+                reg <= data_reg_i;
+            else
+                if shift_en_i = '1' then
+                    reg <= reg(LENGTH-2 downto 0) & Din_i;
                 else
-                    if shift_en_i = '1' then
-                        reg <= reg(LENGTH-2 downto 0) & Din_i;
-                    else
-                        reg <= reg;
-                    end if;
+                    reg <= reg;
                 end if;
             end if;
         end if;
