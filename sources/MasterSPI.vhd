@@ -20,6 +20,10 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 --use IEEE.NUMERIC_STD.ALL;
 --use IEEE.math_real.all;
+use IEEE.math_real.all;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+use IEEE.std_logic_arith.all;
+
 
 
 entity MasterSPI is
@@ -31,10 +35,10 @@ entity MasterSPI is
 				clk_sys_i	: in  STD_LOGIC;	-- Reloj de sincronismo del sistema
 				rst_sys_i	: in  STD_LOGIC;	-- Reset del sistema
            -- Interfaz de hardware
-				SLCK_O		: out STD_LOGIC;		-- Reloj de salida
+				SCLK_O		: out STD_LOGIC;		-- Reloj de salida
 				MOSI_O		: out STD_LOGIC;		-- Datos serie de entrada	
 				MISO_I		: in  STD_LOGIC;		-- Datos serie de salida	
-				SS_O		: out STD_LOGIC;		-- Seleccion de dispositivo (Ship selec)
+				CS_O			: out STD_LOGIC;		-- Seleccion de dispositivo (Ship selec)
 			  -- interfaz de operacion
 				start_i		: in  STD_LOGIC;		-- SeÃ±al de inicio de transmision
 				data_rd_o	: out STD_LOGIC;		-- Dato recibido/fin de operacion	
@@ -46,16 +50,16 @@ end MasterSPI;
 
 architecture Behavioral of MasterSPI is
 
-component div_frec_M
-	generic ( frec_in : REAL := 5000000.0; frec_out : REAL := 1000000.0 );
-	port
-	(
-		clk_in	: in std_logic;
-		enable	: in std_logic;
-		reset	: in std_logic;
-		clk_out	: out std_logic
-	);
-end component;
+--component div_frec_M
+--	generic ( frec_in : REAL := 5000000.0; frec_out : REAL := 1000000.0 );
+--	port
+--	(
+--		clk_in	: in std_logic;
+--		enable	: in std_logic;
+--		reset	: in std_logic;
+--		clk_out	: out std_logic
+--	);
+--end component;
 
 component shift_reg is
 	generic(
@@ -100,30 +104,49 @@ component genTimeOut
 end component;
 
 -- Señales
-type state_type is (IDLE, LOAD_SHIFT, DATA_TRANSFER, END_TRANSFER);
+type state_type is (IDLE, TIME_SETUP, DATA_TRANSFER, TIME_HOLD);
 signal state_reg, state_next : state_type; 
 
---constant N : natural := natural(ceil(log2(real(MOD_MAX))));						-- Cantidad de bits del contador según MOD_MAX
---signal count, count_next : stad_logic_vector(N-1 downto 0) := (others => '0');
+constant N : natural := 8; -- Cantidad de bits del contador según MOD_MAX
+constant MOD_NBITS : STD_LOGIC_VECTOR(N-1 downto 0) := CONV_STD_LOGIC_VECTOR(8,N);
 
+
+signal count, count_next : STD_LOGIC_VECTOR(N-1 downto 0) := (others => '0');
 signal load_tx_s , load_rx_s : std_logic;
 signal data_tx_s , data_rx_s : std_logic_vector(DATA_LENGTH-1 downto 0);
-signal shift_enable_s , load_shift_s : std_logic;
-signal sclk_enable_s : std_logic;
-signal time_out_s : std_logic;
+signal sclk_s, sclk_enable_s : std_logic;
+signal enable_setup_s , enable_hold_s : std_logic;
+signal timeout_setup_s , timeout_hold_s : std_logic;
+signal cs_reg , cs_next : std_logic;
 
 begin
 
-prueba: genTimeOut
-	generic map( TIMEOUT => 1.0e-6 ,	-- TIMEOUT
-				  Tclk 	 => 50.0e-9	-- Periodo del reloj
-				)
-PORT MAP (
-	clk => clk_sys_i,
-	reset => rst_sys_i,
-	enable => sclk_enable_s,
-	time_out => time_out_s
-);
+-- Temporizador para implementar el tiempo de setup
+Inst_time_setup: genTimeOut
+	generic map( 
+		TIMEOUT => 100.0e-9 ,	-- Tiempo de setup
+		Tclk 	 => 20.0e-9			-- Periodo del reloj de sincronismo
+	)
+	PORT MAP (
+		clk 		=> clk_sys_i,
+		reset 	=> rst_sys_i,
+		enable 	=> enable_setup_s,
+		time_out => timeout_setup_s
+	);
+
+-- Temporizador para implementar el tiempo de hold
+Inst_time_hold : genTimeOut
+	generic map( 
+		TIMEOUT => 150.0e-9 ,	-- Tiempo de setup
+		Tclk 	 => 20.0e-9			-- Periodo del reloj de sincronismo
+	)
+	PORT MAP (
+		clk 		=> clk_sys_i,
+		reset 	=> rst_sys_i,
+		enable 	=> enable_hold_s,
+		time_out => timeout_hold_s
+	);	
+
 
 -- Registro que almacena el dato a transmitir
 register_TX: register_N
@@ -155,54 +178,56 @@ register_RX: register_N
 
 shift_register : shift_reg
 	port map (
-		clk_i 		=> clk_sys_i,
+		clk_i 		=> sclk_s,
 		rst_i 		=> rst_sys_i,
-		shift_en_i  => shift_enable_s,
-		load_i 		=> load_shift_s,
+		shift_en_i  => '1',
+		load_i 		=> load_tx_s,
 		data_reg_i 	=> data_tx_s,
 		data_reg_o 	=> data_rx_s,
 		Din_i			=> MISO_I,
 		Dout_o 		=> MOSI_O
 		);
+sclk_s <= clk_sys_i and sclk_enable_s;
 
-sclk_gen: div_frec_M
-	port map (
-		clk_in 	=> clk_sys_i,
-		enable 	=> sclk_enable_s,
-		reset 	=> rst_sys_i,
-		clk_out 	=> SLCK_O
-	);
-
-control: process(state_reg, start_i,time_out_s)
+control: process(state_reg, start_i, cs_reg,timeout_setup_s,timeout_hold_s,count )
 begin
 	state_next <= state_reg;
+	cs_next <= cs_reg;
+	count_next <= count;
 	load_rx_s <= '0';
 	load_tx_s <= '0';
-	load_shift_s <= '0';
-	shift_enable_s <= '0';
 	sclk_enable_s <= '0';
-	
+	enable_setup_s <= '0';
+	enable_hold_s <= '0';
+		
 	case state_reg is
 		when IDLE =>
 			if start_i = '1' then
-				state_next <= LOAD_SHIFT;
-				load_tx_s <= '1';				
+				state_next <= TIME_SETUP;
+				load_tx_s <= '1';
+				cs_next <= '0';				
 			end if;
 		
-		when LOAD_SHIFT =>
-			load_shift_s <= '1';
-			state_next <= DATA_TRANSFER;
-			
-		when DATA_TRANSFER =>
-			shift_enable_s <= '1';
-			sclk_enable_s <= '1';
-			if time_out_s = '1' then 
-				state_next <= END_TRANSFER;
+		when TIME_SETUP => 
+			enable_setup_s <= '1';
+			if timeout_setup_s = '1' then
+				state_next <= DATA_TRANSFER;
 			end if;
 			
-		when END_TRANSFER =>
-			state_next <= IDLE;
-			load_rx_s <= '1';
+		when DATA_TRANSFER =>
+			sclk_enable_s <= '1';
+			count_next <= count + 1 ;
+			if count = MOD_NBITS then 
+				load_rx_s <= '1';
+				state_next <= TIME_HOLD;
+			end if;
+			
+		when TIME_HOLD =>
+			enable_hold_s <= '1';
+			if timeout_hold_s = '1' then
+				cs_next <= '1';
+				state_next <= IDLE;
+			end if;
 			
 		when others =>
 			state_next <= IDLE;
@@ -214,7 +239,12 @@ reloj: process(clk_sys_i)
 begin
 	if rising_edge(clk_sys_i) then
 		state_reg <= state_next;
+		cs_reg <= cs_next;
+		count <= count_next;
 	end if;		
 end process reloj;
+
+CS_O <= cs_reg;
+SCLK_O <= sclk_s;
 
 end Behavioral;

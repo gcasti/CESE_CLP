@@ -43,10 +43,10 @@ ARCHITECTURE behavior OF MasterSPI_tb IS
     PORT(
          clk_sys_i : IN  std_logic;
          rst_sys_i : IN  std_logic;
-         SLCK_O : OUT  std_logic;
+         SCLK_O : OUT  std_logic;
          MOSI_O : OUT  std_logic;
          MISO_I : IN  std_logic;
-         SS_O : OUT  std_logic;
+         CS_O : OUT  std_logic;
          start_i : IN  std_logic;
          data_rd_o : OUT  std_logic;
          data_wr_i : IN  std_logic;
@@ -65,9 +65,9 @@ ARCHITECTURE behavior OF MasterSPI_tb IS
    signal data_tx_i : std_logic_vector(7 downto 0) := (others => '0');
 
  	--Outputs
-   signal SLCK_O : std_logic;
+   signal SCLK_O : std_logic;
    signal MOSI_O : std_logic;
-   signal SS_O : std_logic;
+   signal CS_O : std_logic;
    signal data_rd_o : std_logic;
    signal data_rx_o : std_logic_vector(7 downto 0);
 
@@ -80,10 +80,10 @@ BEGIN
    uut: MasterSPI PORT MAP (
           clk_sys_i => clk_sys_i,
           rst_sys_i => rst_sys_i,
-          SLCK_O => SLCK_O,
+          SCLK_O => SCLK_O,
           MOSI_O => MOSI_O,
           MISO_I => MISO_I,
-          SS_O => SS_O,
+          CS_O => CS_O,
           start_i => start_i,
           data_rd_o => data_rd_o,
           data_wr_i => data_wr_i,
