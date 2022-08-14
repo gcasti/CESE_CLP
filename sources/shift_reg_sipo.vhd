@@ -18,7 +18,7 @@ entity shift_reg_sipo is
 	);
 end entity shift_reg_sipo;
 
-architecture Behavioral of shift_reg is
+architecture Behavioral of shift_reg_sipo is
 
 signal reg : std_logic_vector(LENGTH-1 downto 0) := (others => '0');
 

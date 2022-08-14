@@ -24,26 +24,27 @@
 LIBRARY ieee;                                               
 USE ieee.std_logic_1164.all;                                
 
-ENTITY shift_reg_sipo_tb IS
-END shift_reg_sipo_tb;
+ENTITY shift_reg_piso_tb IS
+END shift_reg_piso_tb;
 
-ARCHITECTURE shift_reg_arch OF shift_reg_sipo_tb IS
+ARCHITECTURE shift_reg_arch OF shift_reg_piso_tb IS
 	constant LENGTH : integer := 8;
 	-- Component Declaration for the Unit Under Test (UUT)
-	component shift_reg_sipo is
+	component shift_reg_piso is
 		generic(
 			LENGTH: integer := 8
 		);
 	port(
 		clk_i     	: in	std_logic;	-- Reloj del sistema
-		rst_i     	: in  std_logic;  -- Señal de reset sincronica
+		rst_i     	: in  	std_logic;  -- Señal de reset sincronica
 		arst_i		: in	std_logic;  -- Señal de reset asincrónica
-		shift_en_i	: in  std_logic;  -- Señal que habilita el desplazamiento de datos 
-		din_i		: in  std_logic; 			   						-- Dato de entrada del registro de desplazamiento
-		data_reg_o	: out	std_logic_vector(LENGTH-1 downto 0)    -- Bus de datos para lectura del registro
+		shift_en_i	: in 	std_logic;  -- Señal que habilita el desplazamiento de datos 
+		load_i		: in	std_logic;	-- Carga del registro de desplamiento
+		dout_o		: out	std_logic;	-- Dato de salida del registro de desplazamiento
+		data_reg_i	: in	std_logic_vector(LENGTH-1 downto 0)    -- Bus de datos para carga del registro
 	);
 
-	end component shift_reg_sipo;
+	end component shift_reg_piso;
  
 	-- constants                                                 
 	-- Inputs                                                   
@@ -51,10 +52,11 @@ ARCHITECTURE shift_reg_arch OF shift_reg_sipo_tb IS
 	signal rst_i 		: STD_LOGIC := '0';
 	signal arst_i 		: STD_LOGIC := '0';
 	signal shift_en_i	: STD_LOGIC := '0';
-	signal din_i		: std_logic := '0';
-
+	signal load_i		: std_logic := '0';
+	signal data_reg_i	: std_logic_vector(LENGTH-1 downto 0);
+	
 	-- Outputs
-	signal data_reg_o : std_logic_vector(LENGTH-1 downto 0);
+	signal dout_o 	: std_logic;
 	
 	-- Clock period definitions
    constant clk_period : time := 20 ns;
@@ -62,15 +64,16 @@ ARCHITECTURE shift_reg_arch OF shift_reg_sipo_tb IS
 begin
 	-- Instantiate the Unit Under Test (UUT)
 	
-	uut : shift_reg_sipo
+	uut : shift_reg_piso
 	port map (
 	-- list connections between master ports and signals
 		clk_i => clk_i,
 		rst_i => rst_i,
 		arst_i => arst_i,
 		shift_en_i => shift_en_i,
-		data_reg_o => data_reg_o,
-		din_i => Din_i
+		load_i => load_i,
+		dout_o => dout_o,
+		data_reg_i => data_reg_i
 		);
 		
 	-- Clock process definitions
@@ -103,15 +106,16 @@ begin
       -- insert stimulus here
 		
 	 	shift_en_i <= '1';
-		din_i <= '1';
+		data_reg_i <= "01001101";
 		wait for 2*clk_period;
-		
-		din_i <= '0';		
+		load_i <= '1';
+		wait for clk_period;
+		load_i <= '0';		
 		
 		wait for clk_period;
 		shift_en_i <= '1';
 
-		wait for clk_period;
+		wait for 5*clk_period;
 
 		rst_i <= '1';
 		wait for clk_period;
