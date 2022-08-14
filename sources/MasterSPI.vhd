@@ -63,7 +63,7 @@ architecture Behavioral of MasterSPI is
 
 component shift_reg_piso is
 	generic(
-		LENGTH: integer := DATA_LENGTH
+		N: integer := DATA_LENGTH
 	);
 	port(
 		clk_i     	: in	std_logic;	-- Reloj del sistema
@@ -72,13 +72,13 @@ component shift_reg_piso is
 		shift_en_i	: in 	std_logic;  -- Señal que habilita el desplazamiento de datos 
 		load_i		: in	std_logic;	-- Carga del registro de desplamiento
 		dout_o		: out	std_logic;	-- Dato de salida del registro de desplazamiento
-		data_reg_i	: in	std_logic_vector(LENGTH-1 downto 0)    -- Bus de datos para carga del registro
+		data_reg_i	: in	std_logic_vector(N-1 downto 0)    -- Bus de datos para carga del registro
 	);
 end component shift_reg_piso;
 
 component shift_reg_sipo is
 	generic(
-		LENGTH: integer := 8
+		N: integer := DATA_LENGTH
 	);
 	port(
 		clk_i     	: in	std_logic;	-- Reloj del sistema
@@ -86,7 +86,7 @@ component shift_reg_sipo is
 		arst_i		: in	std_logic;  -- Señal de reset asincrónica
 		shift_en_i	: in  	std_logic;  -- Señal que habilita el desplazamiento de datos 
 		din_i		: in  	std_logic; 			   						-- Dato de entrada del registro de desplazamiento
-		data_reg_o	: out	std_logic_vector(LENGTH-1 downto 0)    -- Bus de datos para lectura del registro
+		data_reg_o	: out	std_logic_vector(N-1 downto 0)    -- Bus de datos para lectura del registro
 	);
 end component shift_reg_sipo;
 
@@ -239,6 +239,8 @@ begin
 	sclk_enable_s <= '0';
 	enable_setup_s <= '0';
 	enable_hold_s <= '0';
+	shift_en_s <= '0';
+	data_rd_o <= '0';
 		
 	case state_reg is
 		when IDLE =>
@@ -256,6 +258,7 @@ begin
 			
 		when DATA_TRANSFER =>
 			sclk_enable_s <= '1';
+			shift_en_s <= '1';
 			count_next <= count + 1 ;
 			if count = MOD_NBITS then 
 				load_rx_s <= '1';
@@ -266,6 +269,7 @@ begin
 			enable_hold_s <= '1';
 			if timeout_hold_s = '1' then
 				cs_next <= '1';
+				data_rd_o <= '1';		
 				state_next <= IDLE;
 			end if;
 			
