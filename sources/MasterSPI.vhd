@@ -61,21 +61,34 @@ architecture Behavioral of MasterSPI is
 --	);
 --end component;
 
-component shift_reg is
+component shift_reg_piso is
 	generic(
 		LENGTH: integer := DATA_LENGTH
 	);
 	port(
-		clk_i     	: in    std_logic;    -- Reloj del sistema
-		rst_i      	: in    std_logic;    -- Señal de reset sincronica
-		shift_en_i	: in    std_logic;    -- Señal que habilita el desplazamiento de datos 
-		load_i      : in    std_logic;    -- Señal de carga del registro     
-		data_reg_i  : in    std_logic_vector(LENGTH-1 downto 0);   -- Bus de datos para carga del registro
-    	data_reg_o	: out   std_logic_vector(LENGTH-1 downto 0);   -- Bus de datos para lectura del registro
-		Din_i			: in    std_logic;    -- Dato de entrada del registro de desplazamiento
-    	Dout_o      : out   std_logic     -- Dato de salida del registro de desplazamiento       	
+		clk_i     	: in	std_logic;	-- Reloj del sistema
+		rst_i     	: in  	std_logic;  -- Señal de reset sincronica
+		arst_i		: in	std_logic;  -- Señal de reset asincrónica
+		shift_en_i	: in 	std_logic;  -- Señal que habilita el desplazamiento de datos 
+		load_i		: in	std_logic;	-- Carga del registro de desplamiento
+		dout_o		: out	std_logic;	-- Dato de salida del registro de desplazamiento
+		data_reg_i	: in	std_logic_vector(LENGTH-1 downto 0)    -- Bus de datos para carga del registro
 	);
-end component shift_reg;
+end component shift_reg_piso;
+
+component shift_reg_sipo is
+	generic(
+		LENGTH: integer := 8
+	);
+	port(
+		clk_i     	: in	std_logic;	-- Reloj del sistema
+		rst_i     	: in  	std_logic;  -- Señal de reset sincronica
+		arst_i		: in	std_logic;  -- Señal de reset asincrónica
+		shift_en_i	: in  	std_logic;  -- Señal que habilita el desplazamiento de datos 
+		din_i		: in  	std_logic; 			   						-- Dato de entrada del registro de desplazamiento
+		data_reg_o	: out	std_logic_vector(LENGTH-1 downto 0)    -- Bus de datos para lectura del registro
+	);
+end component shift_reg_sipo;
 
 component register_N is
 	generic(
@@ -103,11 +116,11 @@ component genTimeOut
 	);
 end component;
 
--- Se�ales
+-- Se�ales
 type state_type is (IDLE, TIME_SETUP, DATA_TRANSFER, TIME_HOLD);
 signal state_reg, state_next : state_type; 
 
-constant N : natural := 8; -- Cantidad de bits del contador seg�n MOD_MAX
+constant N : natural := 8; -- Cantidad de bits del contador seg�n MOD_MAX
 constant MOD_NBITS : STD_LOGIC_VECTOR(N-1 downto 0) := CONV_STD_LOGIC_VECTOR(8,N);
 
 
@@ -118,6 +131,7 @@ signal sclk_s, sclk_enable_s : std_logic;
 signal enable_setup_s , enable_hold_s : std_logic;
 signal timeout_setup_s , timeout_hold_s : std_logic;
 signal cs_reg , cs_next : std_logic;
+signal shift_en_s : std_logic;
 
 begin
 
@@ -150,43 +164,69 @@ Inst_time_hold : genTimeOut
 
 -- Registro que almacena el dato a transmitir
 register_TX: register_N
-	generic map(
+	generic map
+	(
 		N => DATA_LENGTH
 	)
-	port map(
-		clk_i		=> clk_sys_i,
+	port map
+	(
+		clk_i	=> clk_sys_i,
 		srst_i	=>	rst_sys_i,
 		arst_i 	=> '0',
-		ena_i		=> data_wr_i,
+		ena_i	=> data_wr_i,
 		d_i		=> data_tx_i,
 		q_o		=> data_tx_s
 	);
+-- Registro de desplazamiento de transmisión
+TX_shift_register : shift_reg_piso
+	generic map
+	(
+		N => DATA_LENGTH
+	)
+	port map
+	(
+		clk_i => clk_sys_i,
+		rst_i => rst_sys_i,
+		arst_i => '0',
+		shift_en_i => shift_en_s,
+		load_i => load_tx_s,
+		dout_o => MOSI_O,
+		data_reg_i => data_tx_s
+	);
+
 
 -- Registro que almacena el dato recibido
 register_RX: register_N
-	generic map(
+	generic map
+	(
 		N => DATA_LENGTH
 	)
-	port map(
-		clk_i		=> clk_sys_i,
+	port map
+	(
+		clk_i	=> clk_sys_i,
 		srst_i	=>	rst_sys_i,
 		arst_i 	=> '0',
-		ena_i		=> load_rx_s,
+		ena_i	=> load_rx_s,
 		d_i		=> data_rx_s,
 		q_o		=> data_rx_o
 	);
 
-shift_register : shift_reg
-	port map (
-		clk_i 		=> sclk_s,
-		rst_i 		=> rst_sys_i,
-		shift_en_i  => '1',
-		load_i 		=> load_tx_s,
-		data_reg_i 	=> data_tx_s,
-		data_reg_o 	=> data_rx_s,
-		Din_i			=> MISO_I,
-		Dout_o 		=> MOSI_O
-		);
+-- Registro de desplazamiento de recepción
+RX_shift_register : shift_reg_sipo
+	generic map
+	(
+		N => DATA_LENGTH
+	)	
+	port map 
+	(
+		clk_i => clk_sys_i,
+		rst_i => rst_sys_i,
+		arst_i => '0',
+		shift_en_i => shift_en_s,
+		data_reg_o => data_rx_s,
+		din_i => MISO_I
+	);
+
 sclk_s <= clk_sys_i and sclk_enable_s;
 
 control: process(state_reg, start_i, cs_reg,timeout_setup_s,timeout_hold_s,count )
