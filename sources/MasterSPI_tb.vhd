@@ -43,7 +43,7 @@ ARCHITECTURE behavior OF MasterSPI_tb IS
     PORT(
          clk_sys_i : IN  std_logic;
          rst_sys_i : IN  std_logic;
-         SCLK_O : OUT  std_logic;
+			SCLK_O : OUT  std_logic;
          MOSI_O : OUT  std_logic;
          MISO_I : IN  std_logic;
          CS_O : OUT  std_logic;
@@ -80,7 +80,7 @@ BEGIN
    uut: MasterSPI PORT MAP (
           clk_sys_i => clk_sys_i,
           rst_sys_i => rst_sys_i,
-          SCLK_O => SCLK_O,
+			 SCLK_O => SCLK_O,
           MOSI_O => MOSI_O,
           MISO_I => MISO_I,
           CS_O => CS_O,
@@ -99,7 +99,6 @@ BEGIN
 		clk_sys_i <= '1';
 		wait for clk_period/2;
    end process;
- 
 
    -- Stimulus process
    stim_proc: process
@@ -133,7 +132,18 @@ BEGIN
 		MISO_I <= '0';
 
 
-      wait;
+		wait for 2*clk_period;
+		--Se escribe otro dato
+		data_tx_i <= "11111101";
+		data_wr_i <= '1';
+		wait for clk_period;
+		data_wr_i <= '0';
+		
+		start_i <= '1';
+		wait for clk_period;
+		start_i <= '0';
+      
+		wait;
    end process;
 
 END;

@@ -7,16 +7,16 @@ entity counter_N is
             N: natural := 8        
         );    
     port (
-            clk_sys_i       : in std_logic;
-            rst_sys_i       : in std_logic;
-            load_value_i    : in std_logic;
-            init_value_i    : in std_logic_vector(N-1 downto 0);
-            enable_i        : in std_logic;
-            count_o         : out std_logic_vector(N-1 downto 0)
+            clk_sys_i	 : in std_logic;
+            rst_sys_i    : in std_logic;
+            load_value_i : in std_logic;
+            init_value_i : in std_logic_vector(N-1 downto 0);
+            enable_i     : in std_logic;
+            count_o      : out std_logic_vector(N-1 downto 0)
         );
 end counter_N;
 
-architecture beh of counter_N is
+architecture behavioral of counter_N is
 begin
     process(clk_sys_i, rst_sys_i)
         variable count_i : unsigned(N-1 downto 0);

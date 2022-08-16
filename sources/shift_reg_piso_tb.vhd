@@ -1,26 +1,3 @@
--------------------------------------------------------------------------------
--- Company: 
--- Engineer:
---
--- Create Date:   10:36:51 05/23/2018
--- Design Name:   
--- Module Name:   
--- Project Name:  
--- Target Device:  
--- Tool versions:  
--- Description:   
--- 
--- 
--- Dependencies:
--- 
--- Revision:
--- Revision 0.01 - File Created
--- Additional Comments:
---
--- Notes: 
---
---------------------------------------------------------------------------------
-
 LIBRARY ieee;                                               
 USE ieee.std_logic_1164.all;                                
 
@@ -32,7 +9,7 @@ ARCHITECTURE shift_reg_arch OF shift_reg_piso_tb IS
 	-- Component Declaration for the Unit Under Test (UUT)
 	component shift_reg_piso is
 		generic(
-			LENGTH: integer := 8
+			N: integer := 8
 		);
 	port(
 		clk_i     	: in	std_logic;	-- Reloj del sistema
@@ -41,7 +18,7 @@ ARCHITECTURE shift_reg_arch OF shift_reg_piso_tb IS
 		shift_en_i	: in 	std_logic;  -- Señal que habilita el desplazamiento de datos 
 		load_i		: in	std_logic;	-- Carga del registro de desplamiento
 		dout_o		: out	std_logic;	-- Dato de salida del registro de desplazamiento
-		data_reg_i	: in	std_logic_vector(LENGTH-1 downto 0)    -- Bus de datos para carga del registro
+		data_reg_i	: in	std_logic_vector(N-1 downto 0)    -- Bus de datos para carga del registro
 	);
 
 	end component shift_reg_piso;
@@ -105,8 +82,24 @@ begin
       
       -- insert stimulus here
 		
-	 	shift_en_i <= '1';
-		data_reg_i <= "01001101";
+		data_reg_i <= "11001101";
+		wait for 2*clk_period;
+		load_i <= '1';
+		wait for clk_period;
+		load_i <= '0';		
+		
+		wait for 3*clk_period;
+		shift_en_i <= '1';
+
+		wait for 5*clk_period;
+
+		shift_en_i <= '0';
+
+		wait for 5*clk_period;
+
+		shift_en_i <= '1';
+
+		data_reg_i <= "10101010";
 		wait for 2*clk_period;
 		load_i <= '1';
 		wait for clk_period;
@@ -116,10 +109,6 @@ begin
 		shift_en_i <= '1';
 
 		wait for 5*clk_period;
-
-		rst_i <= '1';
-		wait for clk_period;
-		rst_i <= '0';
 
 		
 	wait;                                                        

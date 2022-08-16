@@ -2,24 +2,25 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- Registro de desplazamiento con entrada de datos paralela y salida serie
+-- Registro de desplazamiento con entrada de datos
+-- paralela y salida serie
 
 entity shift_reg_piso is
 	generic(
 		N: integer := 8
 	);
 	port(
-		clk_i     	: in	std_logic;	-- Reloj del sistema
-		rst_i     	: in  	std_logic;  -- SeÃ±al de reset sincronica
-		arst_i		: in	std_logic;  -- SeÃ±al de reset asincrÃ³nica
-		shift_en_i	: in 	std_logic;  -- SeÃ±al que habilita el desplazamiento de datos 
-		load_i		: in	std_logic;	-- Carga del registro de desplamiento
-		dout_o		: out	std_logic;	-- Dato de salida del registro de desplazamiento
-		data_reg_i	: in	std_logic_vector(N-1 downto 0)    -- Bus de datos para carga del registro
+		clk_i     	: in	std_logic;								-- Reloj del sistema
+		rst_i     	: in  std_logic;								-- Señal de reset sincronica
+		arst_i		: in	std_logic;								-- Señal de reset asincrónica
+		shift_en_i	: in 	std_logic;  							-- Señal que habilita el desplazamiento de datos 
+		load_i		: in	std_logic;								-- Carga del registro de desplamiento
+		dout_o		: out	std_logic;								-- Dato de salida del registro de desplazamiento
+		data_reg_i	: in	std_logic_vector(N-1 downto 0)   -- Bus de datos para carga del registro
 	);
 end entity shift_reg_piso;
 
-architecture Behavioral of shift_reg_piso is
+architecture behavioral of shift_reg_piso is
 
 signal reg : std_logic_vector(N-1 downto 0) := (others => '0');
 
@@ -29,7 +30,7 @@ begin
 	begin
 		if arst_i = '1' then 
 			reg <= (others => '0');
-		elsif rising_edge(clk_i) then
+		elsif falling_edge(clk_i) then
 			if rst_i = '1' then
 				reg <= (others => '0');
 			elsif load_i = '1' then
@@ -44,4 +45,4 @@ begin
 	
 	dout_o <= reg(N - 1);
 
-end architecture Behavioral;
+end architecture behavioral;

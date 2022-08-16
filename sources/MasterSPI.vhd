@@ -19,7 +19,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
---use IEEE.math_real.all;
+use IEEE.math_real.all;
 --use IEEE.math_real.all;
 --use IEEE.STD_LOGIC_UNSIGNED.ALL;
 --use IEEE.std_logic_arith.all;
@@ -27,14 +27,13 @@ use IEEE.NUMERIC_STD.ALL;
 
 
 entity MasterSPI is
-	 generic ( 	DATA_LENGTH 		: integer	:= 8;			-- Cantidad de bits del modulo
-				CLOCK_SYS_FREQUENCY	: real		:= 50.0e6;	-- Frecuencia del reloj de sincronismo
-				CLOCK_SPI_FREQUENCY	: real		:= 1.0e6		-- Frecuencia del modulo SPI
+	 generic ( 
+				DATA_LENGTH 		: integer	:= 8			-- Cantidad de bits del modulo
 				);	
     port ( -- Señales de sincronismo
 				clk_sys_i	: in  STD_LOGIC;	-- Reloj de sincronismo del sistema
 				rst_sys_i	: in  STD_LOGIC;	-- Reset del sistema
-           -- Interfaz de hardware
+			  -- Interfaz de hardware
 				SCLK_O		: out STD_LOGIC;		-- Reloj de salida
 				MOSI_O		: out STD_LOGIC;		-- Datos serie de entrada	
 				MISO_I		: in  STD_LOGIC;		-- Datos serie de salida	
@@ -75,7 +74,7 @@ component shift_reg_sipo is
 		rst_i     	: in  	std_logic;  -- Señal de reset sincronica
 		arst_i		: in	std_logic;  -- Señal de reset asincrónica
 		shift_en_i	: in  	std_logic;  -- Señal que habilita el desplazamiento de datos 
-		din_i		: in  	std_logic; 			   						-- Dato de entrada del registro de desplazamiento
+		din_i			: in  	std_logic; 			   						-- Dato de entrada del registro de desplazamiento
 		data_reg_o	: out	std_logic_vector(N-1 downto 0)    -- Bus de datos para lectura del registro
 	);
 end component shift_reg_sipo;
@@ -95,9 +94,10 @@ component register_N is
 end component register_N;
 
 component genTimeOut
-	generic ( TIMEOUT : real := 100.0e-9 ;	-- TIMEOUT
-				  Tclk 	 :	real := 10.0e-9	-- Periodo del reloj
-				);	
+	generic ( 
+		TIMEOUT : real := 100.0e-9 ;	-- TIMEOUT
+		Tclk 	 :	real := 10.0e-9	-- Periodo del reloj
+		);	
 	port(
 		clk : IN  std_logic;
 		reset : IN  std_logic;
@@ -106,25 +106,106 @@ component genTimeOut
 	);
 end component;
 
+component counter_N is
+	generic(
+		N: natural := 8        
+	);    
+	port (
+		clk_sys_i	 : in std_logic;
+		rst_sys_i    : in std_logic;
+		load_value_i : in std_logic;
+		init_value_i : in std_logic_vector(N-1 downto 0);
+		enable_i     : in std_logic;
+		count_o      : out std_logic_vector(N-1 downto 0)
+	);
+end component;
+
 -- Se�ales
 type state_type is (IDLE, TIME_SETUP, DATA_TRANSFER, TIME_HOLD);
 signal state_reg, state_next : state_type; 
 
--- Optimizar esta parte
-constant N : integer := DATA_LENGTH; -- Cantidad de bits del contador 
---constant MOD_EDGE_COUNT : STD_LOGIC_VECTOR(N-1 downto 0) := CONV_STD_LOGIC_VECTOR(DATA_LENGTH-1,N);
-constant MOD_EDGE_COUNT : STD_LOGIC_VECTOR(N-1 downto 0) := std_logic_vector(to_unsigned(DATA_LENGTH-1,N));
+-- calculo de la cantidad de flancos a contar
+constant N_BITS_COUNTER : integer:= integer(ceil(log2(real(DATA_LENGTH))));	--Cantidad de bits del contador 
+constant MOD_EDGE_COUNT : STD_LOGIC_VECTOR(N_BITS_COUNTER-1 downto 0) := std_logic_vector(to_unsigned(DATA_LENGTH-1,N_BITS_COUNTER));
 
-signal count, count_next : STD_LOGIC_VECTOR(N-1 downto 0) := (others => '0');
-signal load_tx_s , load_rx_s : std_logic;
-signal data_tx_s , data_rx_s : std_logic_vector(DATA_LENGTH-1 downto 0);
-signal sclk_s, sclk_enable_s : std_logic;
-signal enable_setup_s , enable_hold_s : std_logic;
-signal timeout_setup_s , timeout_hold_s : std_logic;
-signal cs_reg , cs_next : std_logic := '0';
-signal shift_en_s : std_logic;
+signal counter_value_s : STD_LOGIC_VECTOR(N_BITS_COUNTER-1 downto 0):= (others=>'0');
+signal load_tx_s , load_rx_s : std_logic := '0';
+signal data_tx_s , data_rx_s : std_logic_vector(DATA_LENGTH-1 downto 0) := (others=>'0');
+signal sclk_s, sclk_enable_s : std_logic := '0';
+signal enable_setup_s , enable_hold_s : std_logic := '0';
+signal timeout_setup_s , timeout_hold_s : std_logic := '0';
+signal cs_reg , cs_next : std_logic := '1';
+signal shift_en_s : std_logic := '0';
+signal load_cout_s , rst_count_s , enable_count_s : std_logic;
+
 
 begin
+
+
+-- M�quina de estados para coordinaci�n
+control: process(state_reg, start_i, cs_reg,timeout_setup_s,timeout_hold_s ,counter_value_s)
+
+begin
+	state_next <= state_reg;
+	cs_next <= cs_reg;
+	load_rx_s <= '0';
+	load_tx_s <= '0';
+	sclk_enable_s <= '0';
+	enable_setup_s <= '0';
+	enable_hold_s <= '0';
+	shift_en_s <= '0';
+	data_rd_o <= '0';
+	enable_count_s <= '0';
+	rst_count_s <= '0';
+	load_cout_s <='0';
+		
+	case state_reg is
+		when IDLE =>
+			if start_i = '1' then
+				state_next <= TIME_SETUP;
+				load_tx_s <= '1';
+				cs_next <= '0';				
+			end if;
+		
+		when TIME_SETUP => 
+			enable_setup_s <= '1';
+			if timeout_setup_s = '1' then
+				state_next <= DATA_TRANSFER;
+				load_tx_s <= '1';
+				rst_count_s <= '1';
+				load_cout_s <= '1';
+			end if;
+			
+		when DATA_TRANSFER =>
+			sclk_enable_s <= '1';
+			shift_en_s <= '1';
+			enable_count_s <= '1';
+			if counter_value_s = MOD_EDGE_COUNT then 
+				load_rx_s <= '1';
+				state_next <= TIME_HOLD;
+			end if;
+			
+		when TIME_HOLD =>
+			enable_hold_s <= '1';
+			if timeout_hold_s = '1' then
+				cs_next <= '1';
+				data_rd_o <= '1';		
+				state_next <= IDLE;
+			end if;
+			
+		when others =>
+			state_next <= IDLE;
+		
+	end case;	
+end process control;
+
+reloj: process(clk_sys_i)
+begin
+	if rising_edge(clk_sys_i) then
+		state_reg <= state_next;
+		cs_reg <= cs_next;
+	end if;		
+end process reloj;
 
 -- Temporizador para implementar el tiempo de setup
 Inst_time_setup: genTimeOut
@@ -152,136 +233,84 @@ Inst_time_hold : genTimeOut
 		time_out => timeout_hold_s
 	);	
 
-
 -- Registro que almacena el dato a transmitir
-register_TX: register_N
+Inst_TX_register: register_N
 	generic map
 	(
 		N => DATA_LENGTH
 	)
 	port map
 	(
-		clk_i	=> clk_sys_i,
+		clk_i		=> clk_sys_i,
 		srst_i	=>	rst_sys_i,
 		arst_i 	=> '0',
-		ena_i	=> data_wr_i,
+		ena_i		=> data_wr_i,
 		d_i		=> data_tx_i,
 		q_o		=> data_tx_s
 	);
 -- Registro de desplazamiento de transmisión
-TX_shift_register : shift_reg_piso
+Inst_TX_shift_register : shift_reg_piso
 	generic map
 	(
 		N => DATA_LENGTH
 	)
 	port map
 	(
-		clk_i => clk_sys_i,
-		rst_i => rst_sys_i,
-		arst_i => '0',
-		shift_en_i => shift_en_s,
-		load_i => load_tx_s,
-		dout_o => MOSI_O,
-		data_reg_i => data_tx_s
+		clk_i			=> clk_sys_i,
+		rst_i			=> rst_sys_i,
+		arst_i		=> '0',
+		shift_en_i 	=> shift_en_s,
+		load_i		=> load_tx_s,
+		dout_o		=> MOSI_O,
+		data_reg_i	=> data_tx_s
 	);
 
-
 -- Registro que almacena el dato recibido
-register_RX: register_N
+Inst_RX_register: register_N
 	generic map
 	(
 		N => DATA_LENGTH
 	)
 	port map
 	(
-		clk_i	=> clk_sys_i,
+		clk_i		=> clk_sys_i,
 		srst_i	=>	rst_sys_i,
 		arst_i 	=> '0',
-		ena_i	=> load_rx_s,
+		ena_i		=> load_rx_s,
 		d_i		=> data_rx_s,
 		q_o		=> data_rx_o
 	);
 
--- Registro de desplazamiento de recepción
-RX_shift_register : shift_reg_sipo
+-- Registro de desplazamiento de recepci�n
+Inst_RX_shift_register : shift_reg_sipo
 	generic map
 	(
 		N => DATA_LENGTH
 	)	
 	port map 
 	(
-		clk_i => clk_sys_i,
-		rst_i => rst_sys_i,
-		arst_i => '0',
-		shift_en_i => shift_en_s,
-		data_reg_o => data_rx_s,
-		din_i => MISO_I
+		clk_i 		=> clk_sys_i,
+		rst_i 		=> rst_sys_i,
+		arst_i 		=> '0',
+		shift_en_i 	=> shift_en_s,
+		data_reg_o	=> data_rx_s,
+		din_i 		=> MISO_I
+	);
+
+Inst_counter : counter_N
+generic map(
+		N => N_BITS_COUNTER       
+	)   
+	port map(
+		clk_sys_i	 => clk_sys_i,	
+		rst_sys_i    => rst_count_s,
+		load_value_i => load_cout_s,
+		init_value_i => (others => '0'),
+		enable_i     => enable_count_s,
+		count_o      => counter_value_s
 	);
 
 sclk_s <= clk_sys_i and sclk_enable_s;
-
-control: process(state_reg, start_i, cs_reg,timeout_setup_s,timeout_hold_s,count )
-variable count_i : unsigned(N-1 downto 0);
-
-begin
-	state_next <= state_reg;
-	cs_next <= cs_reg;
-	count_next <= count;
-	load_rx_s <= '0';
-	load_tx_s <= '0';
-	sclk_enable_s <= '0';
-	enable_setup_s <= '0';
-	enable_hold_s <= '0';
-	shift_en_s <= '0';
-	data_rd_o <= '0';
-		
-	case state_reg is
-		when IDLE =>
-			if start_i = '1' then
-				state_next <= TIME_SETUP;
-				load_tx_s <= '1';
-				cs_next <= '0';				
-			end if;
-		
-		when TIME_SETUP => 
-			enable_setup_s <= '1';
-			if timeout_setup_s = '1' then
-				state_next <= DATA_TRANSFER;
-				count_next <= (others => '0');				
-			end if;
-			
-		when DATA_TRANSFER =>
-			sclk_enable_s <= '1';
-			shift_en_s <= '1';
-			count_i := count_i + 1;
-			count_next <= std_logic_vector(count_i);
-			if count = MOD_EDGE_COUNT then 
-				load_rx_s <= '1';
-				state_next <= TIME_HOLD;
-			end if;
-			
-		when TIME_HOLD =>
-			enable_hold_s <= '1';
-			if timeout_hold_s = '1' then
-				cs_next <= '1';
-				data_rd_o <= '1';		
-				state_next <= IDLE;
-			end if;
-			
-		when others =>
-			state_next <= IDLE;
-		
-	end case;	
-end process control;
-
-reloj: process(clk_sys_i)
-begin
-	if rising_edge(clk_sys_i) then
-		state_reg <= state_next;
-		cs_reg <= cs_next;
-		count <= count_next;
-	end if;		
-end process reloj;
 
 CS_O <= cs_reg;
 SCLK_O <= sclk_s;
