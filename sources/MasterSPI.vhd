@@ -18,11 +18,11 @@
 ----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
---use IEEE.NUMERIC_STD.ALL;
+use IEEE.NUMERIC_STD.ALL;
 --use IEEE.math_real.all;
-use IEEE.math_real.all;
-use IEEE.STD_LOGIC_UNSIGNED.ALL;
-use IEEE.std_logic_arith.all;
+--use IEEE.math_real.all;
+--use IEEE.STD_LOGIC_UNSIGNED.ALL;
+--use IEEE.std_logic_arith.all;
 
 
 
@@ -111,9 +111,9 @@ type state_type is (IDLE, TIME_SETUP, DATA_TRANSFER, TIME_HOLD);
 signal state_reg, state_next : state_type; 
 
 -- Optimizar esta parte
-constant N : natural := DATA_LENGTH; -- Cantidad de bits del contador 
-constant MOD_EDGE_COUNT : STD_LOGIC_VECTOR(N-1 downto 0) := CONV_STD_LOGIC_VECTOR(DATA_LENGTH-1,N);
-
+constant N : integer := DATA_LENGTH; -- Cantidad de bits del contador 
+--constant MOD_EDGE_COUNT : STD_LOGIC_VECTOR(N-1 downto 0) := CONV_STD_LOGIC_VECTOR(DATA_LENGTH-1,N);
+constant MOD_EDGE_COUNT : STD_LOGIC_VECTOR(N-1 downto 0) := std_logic_vector(to_unsigned(DATA_LENGTH-1,N));
 
 signal count, count_next : STD_LOGIC_VECTOR(N-1 downto 0) := (others => '0');
 signal load_tx_s , load_rx_s : std_logic;
@@ -221,6 +221,8 @@ RX_shift_register : shift_reg_sipo
 sclk_s <= clk_sys_i and sclk_enable_s;
 
 control: process(state_reg, start_i, cs_reg,timeout_setup_s,timeout_hold_s,count )
+variable count_i : unsigned(N-1 downto 0);
+
 begin
 	state_next <= state_reg;
 	cs_next <= cs_reg;
@@ -251,7 +253,8 @@ begin
 		when DATA_TRANSFER =>
 			sclk_enable_s <= '1';
 			shift_en_s <= '1';
-			count_next <= count + 1 ;
+			count_i := count_i + 1;
+			count_next <= std_logic_vector(count_i);
 			if count = MOD_EDGE_COUNT then 
 				load_rx_s <= '1';
 				state_next <= TIME_HOLD;
