@@ -72,7 +72,7 @@ ARCHITECTURE behavior OF MasterSPI_tb IS
    signal data_rx_o : std_logic_vector(7 downto 0);
 
    -- Clock period definitions
-   constant clk_sys_i_period : time := 10 ns;
+   constant clk_period : time := 10 ns;
  
 BEGIN
  
@@ -95,9 +95,9 @@ BEGIN
    clk_sys_i_process :process
    begin
 		clk_sys_i <= '0';
-		wait for clk_sys_i_period/2;
+		wait for clk_period/2;
 		clk_sys_i <= '1';
-		wait for clk_sys_i_period/2;
+		wait for clk_period/2;
    end process;
  
 
@@ -107,18 +107,31 @@ BEGIN
       -- hold reset state for 100 ns.
       wait for 100 ns;	
 
-      wait for clk_sys_i_period*10;
+      wait for clk_period*10;
 		
 		data_tx_i <= "00101101";
 		data_wr_i <= '1';
-		wait for clk_sys_i_period;
+		wait for clk_period;
 		data_wr_i <= '0';
 		
       -- insert stimulus here 
 		start_i <= '1';
-		wait for clk_sys_i_period;
+		wait for clk_period;
 		start_i <= '0';
 		
+		
+		wait for 10*clk_period;
+		
+		MISO_I <= '1';
+		
+		wait for 10*clk_period;
+		
+		MISO_I <= '1';
+
+		wait for 2*clk_period;
+		
+		MISO_I <= '0';
+
 
       wait;
    end process;

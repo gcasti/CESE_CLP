@@ -50,16 +50,6 @@ end MasterSPI;
 
 architecture Behavioral of MasterSPI is
 
---component div_frec_M
---	generic ( frec_in : REAL := 5000000.0; frec_out : REAL := 1000000.0 );
---	port
---	(
---		clk_in	: in std_logic;
---		enable	: in std_logic;
---		reset	: in std_logic;
---		clk_out	: out std_logic
---	);
---end component;
 
 component shift_reg_piso is
 	generic(
@@ -120,8 +110,9 @@ end component;
 type state_type is (IDLE, TIME_SETUP, DATA_TRANSFER, TIME_HOLD);
 signal state_reg, state_next : state_type; 
 
-constant N : natural := 8; -- Cantidad de bits del contador seg�n MOD_MAX
-constant MOD_NBITS : STD_LOGIC_VECTOR(N-1 downto 0) := CONV_STD_LOGIC_VECTOR(8,N);
+-- Optimizar esta parte
+constant N : natural := DATA_LENGTH; -- Cantidad de bits del contador 
+constant MOD_EDGE_COUNT : STD_LOGIC_VECTOR(N-1 downto 0) := CONV_STD_LOGIC_VECTOR(DATA_LENGTH-1,N);
 
 
 signal count, count_next : STD_LOGIC_VECTOR(N-1 downto 0) := (others => '0');
@@ -130,7 +121,7 @@ signal data_tx_s , data_rx_s : std_logic_vector(DATA_LENGTH-1 downto 0);
 signal sclk_s, sclk_enable_s : std_logic;
 signal enable_setup_s , enable_hold_s : std_logic;
 signal timeout_setup_s , timeout_hold_s : std_logic;
-signal cs_reg , cs_next : std_logic;
+signal cs_reg , cs_next : std_logic := '0';
 signal shift_en_s : std_logic;
 
 begin
@@ -254,13 +245,14 @@ begin
 			enable_setup_s <= '1';
 			if timeout_setup_s = '1' then
 				state_next <= DATA_TRANSFER;
+				count_next <= (others => '0');				
 			end if;
 			
 		when DATA_TRANSFER =>
 			sclk_enable_s <= '1';
 			shift_en_s <= '1';
 			count_next <= count + 1 ;
-			if count = MOD_NBITS then 
+			if count = MOD_EDGE_COUNT then 
 				load_rx_s <= '1';
 				state_next <= TIME_HOLD;
 			end if;

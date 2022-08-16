@@ -28,7 +28,7 @@ begin
 	begin
 		if arst_i = '1' then 
 			reg <= (others => '0');
-		elsif rising_edge(clk_i) then
+		elsif falling_edge(clk_i) then
 			if rst_i = '1' then
 				reg <= (others => '0');
 			elsif shift_en_i = '1' then
