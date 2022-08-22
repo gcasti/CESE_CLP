@@ -31,8 +31,8 @@ entity MasterSPI is
 				DATA_LENGTH 		: integer	:= 8			-- Cantidad de bits del modulo
 				);	
     port ( -- Señales de sincronismo
-				clk_sys_i	: in  STD_LOGIC;	-- Reloj de sincronismo del sistema
-				rst_sys_i	: in  STD_LOGIC;	-- Reset del sistema
+				clk_sys_i	: in  STD_LOGIC;		-- Reloj de sincronismo del sistema
+				rst_sys_i	: in  STD_LOGIC;		-- Reset del sistema
 				arst_sys_i	: in 	STD_logic;
 			  -- Interfaz de hardware
 				SCLK_O		: out STD_LOGIC;		-- Reloj de salida
@@ -75,7 +75,7 @@ component shift_reg_sipo is
 		rst_i     	: in  	std_logic;  -- Señal de reset sincronica
 		arst_i		: in	std_logic;  -- Señal de reset asincrónica
 		shift_en_i	: in  	std_logic;  -- Señal que habilita el desplazamiento de datos 
-		din_i			: in  	std_logic; 			   						-- Dato de entrada del registro de desplazamiento
+		din_i		: in  	std_logic; 			   			-- Dato de entrada del registro de desplazamiento
 		data_reg_o	: out	std_logic_vector(N-1 downto 0)    -- Bus de datos para lectura del registro
 	);
 end component shift_reg_sipo;
@@ -85,12 +85,12 @@ component register_N is
 		N: natural := DATA_LENGTH
 	);
 	port(
-		clk_i		: in std_logic;		-- clock
-		srst_i	: in std_logic;		-- reset sincronico
-		arst_i	: in std_logic;		-- reset asincronico
-		ena_i		: in std_logic;		-- habilitador
-		d_i		: in std_logic_vector(N-1 downto 0);		-- dato de entrada
-		q_o		: out std_logic_vector(N-1 downto 0)		-- dato de salida
+		clk_sys_i	: in std_logic;		-- Reloj de sincronismo
+		rst_sys_i	: in std_logic;		-- Reset sincronico del modulo
+		arst_sys_i	: in std_logic;		-- Reset asincronico del modulo
+		enable_i	: in std_logic;		-- Carga el valor del bus de entrada
+		data_i		: in std_logic_vector(N-1 downto 0);	-- Dato de entrada
+		data_o		: out std_logic_vector(N-1 downto 0)	-- Dato de salida
 	);
 end component register_N;
 
@@ -215,8 +215,8 @@ Inst_time_setup: genTimeOut
 		TIMEOUT => 100.0e-9 ,	-- Tiempo de setup
 		Tclk 	 => 20.0e-9			-- Periodo del reloj de sincronismo
 	)
-	PORT MAP (
-		clk 		=> clk_sys_i,
+	port map (
+		clk 	=> clk_sys_i,
 		reset 	=> rst_sys_i,
 		enable 	=> enable_setup_s,
 		time_out => timeout_setup_s
@@ -228,8 +228,8 @@ Inst_time_hold : genTimeOut
 		TIMEOUT => 150.0e-9 ,	-- Tiempo de setup
 		Tclk 	 => 20.0e-9			-- Periodo del reloj de sincronismo
 	)
-	PORT MAP (
-		clk 		=> clk_sys_i,
+	port map (
+		clk 	=> clk_sys_i,
 		reset 	=> rst_sys_i,
 		enable 	=> enable_hold_s,
 		time_out => timeout_hold_s
@@ -237,29 +237,25 @@ Inst_time_hold : genTimeOut
 
 -- Registro que almacena el dato a transmitir
 Inst_TX_register: register_N
-	generic map
-	(
+	generic map (
 		N => DATA_LENGTH
 	)
-	port map
-	(
-		clk_i		=> clk_sys_i,
-		srst_i	=>	rst_sys_i,
-		arst_i 	=> '0',
-		ena_i		=> data_wr_i,
-		d_i		=> data_tx_i,
-		q_o		=> data_tx_s
+	port map (
+		clk_sys_i 	=> clk_sys_i,
+		rst_sys_i 	=> rst_sys_i,
+		arst_sys_i	=> arst_sys_i,
+		enable_i	=> data_wr_i,
+		data_i		=> data_tx_i,
+		data_o		=> data_tx_s
 	);
 -- Registro de desplazamiento de transmisión
 Inst_TX_shift_register : shift_reg_piso
-	generic map
-	(
+	generic map (
 		N => DATA_LENGTH
 	)
-	port map
-	(
-		clk_i			=> clk_sys_i,
-		rst_i			=> rst_sys_i,
+	port map (
+		clk_i		=> clk_sys_i,
+		rst_i		=> rst_sys_i,
 		arst_i		=> '0',
 		shift_en_i 	=> shift_en_s,
 		load_i		=> load_tx_s,
@@ -269,28 +265,25 @@ Inst_TX_shift_register : shift_reg_piso
 
 -- Registro que almacena el dato recibido
 Inst_RX_register: register_N
-	generic map
-	(
+	generic map (
 		N => DATA_LENGTH
 	)
 	port map
 	(
-		clk_i		=> clk_sys_i,
-		srst_i	=>	rst_sys_i,
-		arst_i 	=> '0',
-		ena_i		=> load_rx_s,
-		d_i		=> data_rx_s,
-		q_o		=> data_rx_o
+		clk_sys_i	=> clk_sys_i,
+		rst_sys_i	=> rst_sys_i,
+		arst_sys_i	=> arst_sys_i,
+		enable_i	=> load_rx_s,
+		data_i		=> data_rx_s,
+		data_o		=> data_rx_o
 	);
 
 -- Registro de desplazamiento de recepci�n
 Inst_RX_shift_register : shift_reg_sipo
-	generic map
-	(
+	generic map (
 		N => DATA_LENGTH
 	)	
-	port map 
-	(
+	port map (
 		clk_i 		=> clk_sys_i,
 		rst_i 		=> rst_sys_i,
 		arst_i 		=> '0',
