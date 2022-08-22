@@ -33,6 +33,7 @@ entity MasterSPI is
     port ( -- SeÃ±ales de sincronismo
 				clk_sys_i	: in  STD_LOGIC;	-- Reloj de sincronismo del sistema
 				rst_sys_i	: in  STD_LOGIC;	-- Reset del sistema
+				arst_sys_i	: in 	STD_logic;
 			  -- Interfaz de hardware
 				SCLK_O		: out STD_LOGIC;		-- Reloj de salida
 				MOSI_O		: out STD_LOGIC;		-- Datos serie de entrada	
@@ -113,6 +114,7 @@ component counter_N is
 	port (
 		clk_sys_i	 : in std_logic;
 		rst_sys_i    : in std_logic;
+		arst_sys_i	 : in std_logic;
 		load_value_i : in std_logic;
 		init_value_i : in std_logic_vector(N-1 downto 0);
 		enable_i     : in std_logic;
@@ -142,7 +144,7 @@ signal load_cout_s , rst_count_s , enable_count_s : std_logic;
 begin
 
 
--- Máquina de estados para coordinación
+-- Mï¿½quina de estados para coordinaciï¿½n
 control: process(state_reg, start_i, cs_reg,timeout_setup_s,timeout_hold_s ,counter_value_s)
 
 begin
@@ -281,7 +283,7 @@ Inst_RX_register: register_N
 		q_o		=> data_rx_o
 	);
 
--- Registro de desplazamiento de recepción
+-- Registro de desplazamiento de recepciï¿½n
 Inst_RX_shift_register : shift_reg_sipo
 	generic map
 	(
@@ -304,6 +306,7 @@ generic map(
 	port map(
 		clk_sys_i	 => clk_sys_i,	
 		rst_sys_i    => rst_count_s,
+		arst_sys_i 	 => arst_sys_i,
 		load_value_i => load_cout_s,
 		init_value_i => (others => '0'),
 		enable_i     => enable_count_s,

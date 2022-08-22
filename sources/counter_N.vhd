@@ -7,7 +7,7 @@ entity counter_N is
             N: natural := 8        
         );    
     port (
-            clk_sys_i	 : in std_logic;		-- Reloj de sincroni
+            clk_sys_i	 : in std_logic;		-- Reloj de sincronismo
             rst_sys_i    : in std_logic;		-- Reset sincronico del modulo
 				arst_sys_i	 : in std_logic;		-- Reset asincronico del modulo	
             load_value_i : in std_logic;		-- Carga el valor inicial de la contador
