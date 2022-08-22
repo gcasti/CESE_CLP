@@ -7,21 +7,24 @@ entity counter_N is
             N: natural := 8        
         );    
     port (
-            clk_sys_i	 : in std_logic;
-            rst_sys_i    : in std_logic;
-            load_value_i : in std_logic;
-            init_value_i : in std_logic_vector(N-1 downto 0);
-            enable_i     : in std_logic;
-            count_o      : out std_logic_vector(N-1 downto 0)
+            clk_sys_i	 : in std_logic;		-- Reloj de sincroni
+            rst_sys_i    : in std_logic;		-- Reset sincronico del modulo
+				arst_sys_i	 : in std_logic;		-- Reset asincronico del modulo	
+            load_value_i : in std_logic;		-- Carga el valor inicial de la contador
+            init_value_i : in std_logic_vector(N-1 downto 0);	-- Bus con el valor inicial a cargar
+            enable_i     : in std_logic;						-- Habilita la cuenta	
+            count_o      : out std_logic_vector(N-1 downto 0)	-- Bus con el valor de la cuenta
         );
 end counter_N;
 
 architecture behavioral of counter_N is
 begin
-    process(clk_sys_i, rst_sys_i)
+    process(clk_sys_i, rst_sys_i ,arst_sys_i)
         variable count_i : unsigned(N-1 downto 0);
     begin
-        if (rising_edge(clk_sys_i)) then
+		  if arst_sys_i = '1' then
+				count_i := (others => '0');				
+        elsif(rising_edge(clk_sys_i)) then
             if (rst_sys_i ='1') then
                 count_i := (others => '0');
             elsif (load_value_i = '1') then
