@@ -10,9 +10,8 @@ use IEEE.std_logic_arith.all;
 
 entity Test_MasterSPI is
 	 generic (
-				DATA_LENGTH 		: integer	:= 8;			-- Cantidad de bits del modulo
-				CLOCK_SYS_FREQUENCY	: real	:= 50.0e6;	-- Frecuencia del reloj de sincronismo
-				CLOCK_SPI_FREQUENCY	: real	:= 1.0e6		-- Frecuencia del modulo SPI
+				DATA_LENGTH 		: integer	:= 8			-- Cantidad de bits del modulo
+				
 				);	
     port ( -- Señales de sincronismo
 				clk_sys_i	: in  STD_LOGIC;	-- Reloj de sincronismo del sistema
@@ -38,19 +37,20 @@ architecture Behavioral of Test_MasterSPI is
 
 signal clk_sys_s : std_logic;
 signal start_s , data_wr_s : std_logic;
-signal rst_sys_s , arst_sys_s	: std_logic;
+signal rst_sys_s , arst_sys_s , led_s : std_logic;
 
 
 component MasterSPI is
 	 generic ( 
 				DATA_LENGTH 		: integer	:= 8;			-- Cantidad de bits del modulo
 				CLK_SYS_PERIOD		: real		:= 200.0e-9;
-				SET_TIME_HOLD		: real		:= 1.0e-6;
-				SET_TIME_SETUP		: real		:= 2.0e-6
+				SET_TIME_SETUP		: real		:= 1.0e-6;
+				SET_TIME_HOLD		: real		:= 2.0e-6
 				);	
     port ( -- Señales de sincronismo
 				clk_sys_i	: in  STD_LOGIC;	-- Reloj de sincronismo del sistema
 				rst_sys_i	: in  STD_LOGIC;	-- Reset del sistema
+				clk_spi_i	: in	STD_LOGIC;	
 				arst_sys_i	: in	STD_LOGIC; 
            -- Interfaz de hardware
 				SCLK_O		: out STD_LOGIC;		-- Reloj de salida
@@ -105,6 +105,7 @@ Inst_MasterSPI : MasterSPI
 				)
     port map( 
 				clk_sys_i 	=> clk_sys_s,
+				clk_spi_i	=> clk_sys_s,
 				rst_sys_i 	=> rst_sys_s,
 				arst_sys_i 	=> arst_sys_s,
 				
@@ -114,34 +115,37 @@ Inst_MasterSPI : MasterSPI
 				CS_O	 		=> CS_O,
 			  -- interfaz de operacion
 				start_i		=> start_s,		
-				data_rd_o 	=> LEDR(1),	
+				data_rd_o 	=> led_s,	
 				data_wr_i 	=> data_wr_s,	
 				data_tx_i 	=> SW,	
-				data_rx_o 	=> LEDR(9 downto 2)	
+				data_rx_o 	=> LEDR(7 downto 0)	
 			  );
 			  
 Inst_div : div_frec_M
 	generic map(
-				frec_in => 50.0e6,		-- Frecuencia que proviene del PLL
+				frec_in => 5.0e6,		-- Frecuencia que proviene del PLL
 				frec_out => 1.0 
 				)		  
 	port map (
-				clk_in => clk_sys_i,
+				clk_in => clk_sys_s,
 				enable => '1',
 				reset  => rst_sys_s,
-				clk_out => LEDR(0)
+				clk_out => LEDR(9)
 			  );
 
-pll_inst : component pll
+pll_inst : pll
 		port map (
 			refclk   => clk_sys_i,   --  refclk.clk
 			rst      => rst_sys_s,      --   reset.reset
 			outclk_0 => clk_sys_s -- outclk0.clk
 		);	
-		
+
+	
 test(0) <= clk_sys_s;
 test(1) <= start_s;
-test(2) <= not KEY(0);
+test(2) <= clk_sys_s;
+
+LEDR(8) <= led_s;
 
 rst_sys_s <= not KEY(1); 
 arst_sys_s <= not KEY(2);

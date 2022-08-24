@@ -41,25 +41,27 @@ ARCHITECTURE behavior OF MasterSPI_tb IS
  
     COMPONENT MasterSPI
     PORT(
-         clk_sys_i : IN  std_logic;
-         rst_sys_i : IN  std_logic;
-         arst_sys_i : IN  std_logic;
-			SCLK_O : OUT  std_logic;
-         MOSI_O : OUT  std_logic;
-         MISO_I : IN  std_logic;
-         CS_O : OUT  std_logic;
-         start_i : IN  std_logic;
-         data_rd_o : OUT  std_logic;
-         data_wr_i : IN  std_logic;
-         data_tx_i : IN  std_logic_vector(7 downto 0);
-         data_rx_o : OUT  std_logic_vector(7 downto 0)
+         clk_sys_i   : IN  std_logic;
+         clk_spi_i   : IN  std_logic;
+         rst_sys_i   : IN  std_logic;
+         arst_sys_i  : IN  std_logic;
+			SCLK_O      : OUT  std_logic;
+         MOSI_O      : OUT  std_logic;
+         MISO_I      : IN  std_logic;
+         CS_O        : OUT  std_logic;
+         start_i     : IN  std_logic;
+         data_rd_o   : OUT  std_logic;
+         data_wr_i   : IN  std_logic;
+         data_tx_i   : IN  std_logic_vector(7 downto 0);
+         data_rx_o   : OUT  std_logic_vector(7 downto 0)
         );
     END COMPONENT;
     
 
    --Inputs
    signal clk_sys_i : std_logic := '0';
-   signal rst_sys_i : std_logic := '0';
+   signal clk_spi_i : std_logic := '0';
+   signal rst_sys_i : std_logic := '1';
    signal arst_sys_i : std_logic := '0';
    signal MISO_I : std_logic := '0';
    signal start_i : std_logic := '0';
@@ -74,13 +76,14 @@ ARCHITECTURE behavior OF MasterSPI_tb IS
    signal data_rx_o : std_logic_vector(7 downto 0);
 
    -- Clock period definitions
-   constant clk_period : time := 10 ns;
+   constant clk_period : time := 200 ns;
  
 BEGIN
  
 	-- Instantiate the Unit Under Test (UUT)
    uut: MasterSPI PORT MAP (
           clk_sys_i => clk_sys_i,
+          clk_spi_i => clk_spi_i,
           rst_sys_i => rst_sys_i,
 			 arst_sys_i => arst_sys_i,
           SCLK_O => SCLK_O,
@@ -103,39 +106,48 @@ BEGIN
 		wait for clk_period/2;
    end process;
 
+ -- Clock process definitions
+   clk_spi_i_process :process
+   begin
+      clk_spi_i <= '0';
+      wait for clk_period/2;
+      clk_spi_i <= '1';
+      wait for clk_period/2;
+   end process;
+
    -- Stimulus process
    stim_proc: process
    begin		
       -- hold reset state for 100 ns.
       wait for 100 ns;	
-
+      rst_sys_i <= '0';
+	
       wait for clk_period*10;
 		
 		data_tx_i <= "00101101";
+      -- Se carga dato a transmitir
 		data_wr_i <= '1';
 		wait for clk_period;
 		data_wr_i <= '0';
-		
-      -- insert stimulus here 
-		start_i <= '1';
+	
+      -- Inicio de transmisión   
+   	start_i <= '1';
 		wait for clk_period;
 		start_i <= '0';
 		
-		
-		wait for 10*clk_period;
-		
-		MISO_I <= '1';
-		
-		wait for 10*clk_period;
-		
-		MISO_I <= '1';
+      -- espera tiempo de setup
 
-		wait for 2*clk_period;
+		wait for 6*clk_period;
+		
+		MISO_I <= '1';
+		
+		wait for 3*clk_period;
 		
 		MISO_I <= '0';
 
+	
 
-		wait for 2*clk_period;
+		wait for 100*clk_period;
 		--Se escribe otro dato
 		data_tx_i <= "11111101";
 		data_wr_i <= '1';
