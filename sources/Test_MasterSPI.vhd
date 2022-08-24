@@ -127,7 +127,7 @@ Inst_div : div_frec_M
 				)		  
 	port map (
 				clk_in => clk_sys_i,
-				enable => KEY(3),
+				enable => '1',
 				reset  => rst_sys_s,
 				clk_out => LEDR(0)
 			  );
@@ -159,7 +159,7 @@ inst_load_send: edge_detector
 port map (
   i_clk => clk_sys_s,
   i_rstb => rst_sys_s,
-  i_input => KEY(2),
+  i_input => KEY(3),
   o_pulse => data_wr_s
   );
 
