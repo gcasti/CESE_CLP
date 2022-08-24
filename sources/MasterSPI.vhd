@@ -28,7 +28,10 @@ use IEEE.math_real.all;
 
 entity MasterSPI is
 	 generic ( 
-				DATA_LENGTH 		: integer	:= 8			-- Cantidad de bits del modulo
+				DATA_LENGTH 		: integer	:= 8;			-- Cantidad de bits del modulo
+				CLK_SYS_PERIOD		: real		:= 20.0e-9;
+				SET_TIME_HOLD		: real		:= 0.5e-6;
+				SET_TIME_SETUP		: real		:= 1.0e-6
 				);	
     port ( -- Señales de sincronismo
 				clk_sys_i	: in  STD_LOGIC;		-- Reloj de sincronismo del sistema
@@ -57,7 +60,7 @@ component shift_reg_piso is
 	);
 	port(
 		clk_i     	: in	std_logic;	-- Reloj del sistema
-		rst_i     	: in  	std_logic;  -- Señal de reset sincronica
+		rst_i     	: in  std_logic;  -- Señal de reset sincronica
 		arst_i		: in	std_logic;  -- Señal de reset asincrónica
 		shift_en_i	: in 	std_logic;  -- Señal que habilita el desplazamiento de datos 
 		load_i		: in	std_logic;	-- Carga del registro de desplamiento
@@ -138,7 +141,7 @@ signal enable_setup_s , enable_hold_s : std_logic := '0';
 signal timeout_setup_s , timeout_hold_s : std_logic := '0';
 signal cs_reg , cs_next : std_logic := '1';
 signal shift_en_s : std_logic := '0';
-signal load_cout_s , rst_count_s , enable_count_s : std_logic;
+signal load_cout_s , rst_count_s , enable_count_s, rst_timer_s : std_logic;
 
 
 begin
@@ -159,6 +162,7 @@ begin
 	data_rd_o <= '0';
 	enable_count_s <= '0';
 	rst_count_s <= '0';
+	rst_timer_s <= '0';
 	load_cout_s <='0';
 		
 	case state_reg is
@@ -166,7 +170,8 @@ begin
 			if start_i = '1' then
 				state_next <= TIME_SETUP;
 				load_tx_s <= '1';
-				cs_next <= '0';				
+				cs_next <= '0';
+				rst_timer_s <= '1';				
 			end if;
 		
 		when TIME_SETUP => 
@@ -212,12 +217,12 @@ end process reloj;
 -- Temporizador para implementar el tiempo de setup
 Inst_time_setup: genTimeOut
 	generic map( 
-		TIMEOUT => 100.0e-9 ,	-- Tiempo de setup
-		Tclk 	 => 20.0e-9			-- Periodo del reloj de sincronismo
+		TIMEOUT => SET_TIME_HOLD ,	-- Tiempo de setup
+		Tclk 	 => CLK_SYS_PERIOD			-- Periodo del reloj de sincronismo
 	)
 	port map (
 		clk 	=> clk_sys_i,
-		reset 	=> rst_sys_i,
+		reset 	=> rst_timer_s,
 		enable 	=> enable_setup_s,
 		time_out => timeout_setup_s
 	);
@@ -225,12 +230,12 @@ Inst_time_setup: genTimeOut
 -- Temporizador para implementar el tiempo de hold
 Inst_time_hold : genTimeOut
 	generic map( 
-		TIMEOUT => 150.0e-9 ,	-- Tiempo de setup
-		Tclk 	 => 20.0e-9			-- Periodo del reloj de sincronismo
+		TIMEOUT => SET_TIME_SETUP,	-- Tiempo de setup
+		Tclk 	 => CLK_SYS_PERIOD			-- Periodo del reloj de sincronismo
 	)
 	port map (
 		clk 	=> clk_sys_i,
-		reset 	=> rst_sys_i,
+		reset 	=> rst_timer_s,
 		enable 	=> enable_hold_s,
 		time_out => timeout_hold_s
 	);	
@@ -256,7 +261,7 @@ Inst_TX_shift_register : shift_reg_piso
 	port map (
 		clk_i		=> clk_sys_i,
 		rst_i		=> rst_sys_i,
-		arst_i		=> '0',
+		arst_i		=> arst_sys_i,
 		shift_en_i 	=> shift_en_s,
 		load_i		=> load_tx_s,
 		dout_o		=> MOSI_O,
@@ -286,7 +291,7 @@ Inst_RX_shift_register : shift_reg_sipo
 	port map (
 		clk_i 		=> clk_sys_i,
 		rst_i 		=> rst_sys_i,
-		arst_i 		=> '0',
+		arst_i 		=> arst_sys_i,
 		shift_en_i 	=> shift_en_s,
 		data_reg_o	=> data_rx_s,
 		din_i 		=> MISO_I
